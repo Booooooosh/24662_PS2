@@ -47,7 +47,6 @@ Services provided:
     ``rosservice call [service_name] [*kargs...]``**
 
 **Here we listed the services you might need for this Problem Set:**
-|-------------------------------------------|--------------------|-----------------------|------------------------------------------|
 | service_name                              | arguments          | return _value         | description                              |
 |-------------------------------------------|--------------------|-----------------------|------------------------------------------|
 | /denso_robot_interface/mark_state         | State Name         | Success? [Reason]     | mark down the current robot state        |
@@ -56,8 +55,7 @@ Services provided:
 | /denso_robot_interface/upload_states      | File Name          | Success? [Reason]     | save the marked-down states to YAML file |
 | /denso_robot_interface/execute_trajectory | Empty              | Success? [Reason]     | execute the marked-down states in order  |
 | /denso_robot_interface/go_to              | geometry_msgs/Pose | Success? [Reason]     | go to a Pose target                      |
-| /denso_robot_interface/translation        | float64[]          | Success? [Percentage] | follow a translation-only trajectory     |
-|-------------------------------------------|--------------------|-----------------------|------------------------------------------|
+| /denso_robot_interface/translation        | float64[]          | Success? [Percentage] | follow a translation-only trajectory     |_
 **Note that you can always use [TAB] to perform command auto-completion (including arguments). If you pressed [TAB], waited and nothing happened, do ``source devel/setup.bash`` in the current command window and try again**
 **mark_state ONLY save the states dynamically, that is, if you restart the ROS, everything you've been working on will be lost. Use upload_states to save the states on your hard drive. The default folder for your saved YAML file is "denso_robot_interface/yaml/your_file.yaml"**_
 
