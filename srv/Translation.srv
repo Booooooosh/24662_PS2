@@ -1,0 +1,8 @@
+# Request
+std_msgs/Header header
+float64[] trajectory
+---
+# Response
+bool success
+float64 percentage
+string reason

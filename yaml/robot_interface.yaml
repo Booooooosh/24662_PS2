@@ -1,0 +1,4 @@
+workspace:
+  ref_frame: "robot_work_frame"
+  # meshes:
+  #   buildbox: "package://robot_interface/meshes/buildbox.STL"

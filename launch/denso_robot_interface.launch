@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <arg name="robot_name" default="vs060" />
+
+  <!-- launch the interface node -->
+  <node name="denso_robot_interface" pkg="denso_robot_interface" type="denso_robot_interface" respawn="true" output="screen">
+    <!-- remap the joint state topic -->
+    <remap from="/joint_states" to="/$(arg robot_name)/joint_states" />
+    <rosparam command="load" file="$(find denso_robot_interface)/yaml/robot_interface.yaml" />
+  </node>
+
+  <rosparam ns="ps2_2" command="load" file="$(find denso_robot_interface)/yaml/ps2_2.yaml" />
+
+</launch>
+

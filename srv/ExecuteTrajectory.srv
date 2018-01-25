@@ -1,0 +1,7 @@
+# Request
+std_msgs/Empty empty_request
+---
+# Respond
+bool success
+float64 percentage
+string reason

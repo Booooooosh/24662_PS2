@@ -1,0 +1,7 @@
+# Request
+std_msgs/Empty empty_request
+---
+# Response
+string[] states
+bool success
+string reason
