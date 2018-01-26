@@ -17,7 +17,7 @@
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
 
-#include <moveit/move_group_interface/move_group.h>
+#include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/DisplayRobotState.h>
 #include <moveit_msgs/DisplayTrajectory.h>
@@ -72,7 +72,7 @@ class DensoRobotInterface {
   ros::ServiceServer download_states;
 
   // moveit interface
-  moveit::planning_interface::MoveGroup manipulator;
+  moveit::planning_interface::MoveGroupInterface manipulator;
   moveit::planning_interface::PlanningSceneInterface planning_scene;
 
  public:
@@ -103,44 +103,44 @@ class DensoRobotInterface {
     ROS_INFO("[rbt_trj] Done.");
 
     // load buildbox into planning scene
-    std::map<std::string, std::string> models;
-    std::string model_ref_frame = this->pnh.param<std::string>("workspace/ref_frame", "robot_work_frame");
-    if (this->pnh.getParam("workspace/meshes", models) == false) {
-      ROS_WARN("[rbt_trj] Workcell environment not loaded, yaml file not found.");
-    } else {
-      ROS_INFO("[rbt_trj] Loading workspace environment...");
-      for (std::map<std::string, std::string>::iterator it = models.begin(); it != models.end(); ++ it) {
-        moveit_msgs::CollisionObject collision_object;
-        collision_object.header.frame_id = model_ref_frame;
-        collision_object.id = it->first;
+    // std::map<std::string, std::string> models;
+    // std::string model_ref_frame = this->pnh.param<std::string>("workspace/ref_frame", "robot_work_frame");
+    // if (this->pnh.getParam("workspace/meshes", models) == false) {
+    //   ROS_WARN("[rbt_trj] Workcell environment not loaded, yaml file not found.");
+    // } else {
+    //   ROS_INFO("[rbt_trj] Loading workspace environment...");
+    //   for (std::map<std::string, std::string>::iterator it = models.begin(); it != models.end(); ++ it) {
+    //     moveit_msgs::CollisionObject collision_object;
+    //     collision_object.header.frame_id = model_ref_frame;
+    //     collision_object.id = it->first;
 
-        shapes::Mesh *cell = shapes::createMeshFromResource(it->second);
-        if (!cell) {
-          ROS_WARN("[rbt_trj] Work cell environment not loaded. File not found.");
-          continue;
-        }
-        shapes::ShapeMsg mesh_msg;
-        shapes::constructMsgFromShape(cell, mesh_msg);
-        shape_msgs::Mesh mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
-        collision_object.meshes.resize(1);
-        collision_object.mesh_poses.resize(1);
+    //     shapes::Mesh *cell = shapes::createMeshFromResource(it->second);
+    //     if (!cell) {
+    //       ROS_WARN("[rbt_trj] Work cell environment not loaded. File not found.");
+    //       continue;
+    //     }
+    //     shapes::ShapeMsg mesh_msg;
+    //     shapes::constructMsgFromShape(cell, mesh_msg);
+    //     shape_msgs::Mesh mesh = boost::get<shape_msgs::Mesh>(mesh_msg);
+    //     collision_object.meshes.resize(1);
+    //     collision_object.mesh_poses.resize(1);
 
-        collision_object.meshes[0] = mesh;
-        collision_object.mesh_poses[0].position.x = 0.f;
-        collision_object.mesh_poses[0].position.y = 0.f;
-        collision_object.mesh_poses[0].position.z = 0.f;
-        collision_object.mesh_poses[0].orientation.w = 1.0;
-        collision_object.mesh_poses[0].orientation.x = 0.f;
-        collision_object.mesh_poses[0].orientation.y = 0.f;
-        collision_object.mesh_poses[0].orientation.z = 0.f;
+    //     collision_object.meshes[0] = mesh;
+    //     collision_object.mesh_poses[0].position.x = 0.f;
+    //     collision_object.mesh_poses[0].position.y = 0.f;
+    //     collision_object.mesh_poses[0].position.z = 0.f;
+    //     collision_object.mesh_poses[0].orientation.w = 1.0;
+    //     collision_object.mesh_poses[0].orientation.x = 0.f;
+    //     collision_object.mesh_poses[0].orientation.y = 0.f;
+    //     collision_object.mesh_poses[0].orientation.z = 0.f;
 
-        collision_object.operation = collision_object.ADD;
+    //     collision_object.operation = collision_object.ADD;
 
-        this->planning_scene.applyCollisionObject(collision_object);
-      }
+    //     this->planning_scene.applyCollisionObject(collision_object);
+    //   }
 
-      ROS_INFO("[rbt_trj] Done.");
-    }
+    //   ROS_INFO("[rbt_trj] Done.");
+    // }
 
     // start state monitor
     ROS_INFO("[rbt_trj] Starting state monitor...");
@@ -280,14 +280,14 @@ class DensoRobotInterface {
     // execute in order
     int num_of_waypoints = (int)(this->waypoints.size()), cur_waypoint = 0;
     bool success = false;
-    moveit::planning_interface::MoveGroup::Plan next_waypoint;
+    moveit::planning_interface::MoveGroupInterface::Plan next_waypoint;
     ROS_INFO("[rbt_trj] Executing trajectory...");
     for (std::vector<std::string>::iterator it = this->waypoints.begin(); it != this->waypoints.end(); ++ it) {
       cur_waypoint += 1;
       this->manipulator.setNamedTarget(*it);
-      if (this->manipulator.plan(next_waypoint)) {
+      if (this->manipulator.plan(next_waypoint) == moveit::planning_interface::MoveItErrorCode::SUCCESS) {
         ROS_INFO("[rbt_trj] Executing %s...", (*it).c_str());
-        success = this->manipulator.execute(next_waypoint);
+        success = (this->manipulator.execute(next_waypoint) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
         // if (!success) {
         //   res.success = false;
         //   res.percentage = (1.0 * (cur_waypoint - 1) / num_of_waypoints);
@@ -318,11 +318,11 @@ class DensoRobotInterface {
    */
   bool go_toCb(denso_robot_interface::GoTo::Request &req, 
                 denso_robot_interface::GoTo::Response &res) {
-    moveit::planning_interface::MoveGroup::Plan next_position;
+    moveit::planning_interface::MoveGroupInterface::Plan next_position;
     this->manipulator.setPoseTarget(req.next);
-    if (this->manipulator.plan(next_position)) {
+    if (this->manipulator.plan(next_position) == moveit::planning_interface::MoveItErrorCode::SUCCESS) {
       ROS_INFO("[rbt_trj] Executing your pose target...");
-      bool success = this->manipulator.execute(next_position);
+      bool success = (this->manipulator.execute(next_position) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
       // if (!success) {
       //   res.success = false;
       //   res.reason = "Failed to execute the plan.";
@@ -391,9 +391,9 @@ class DensoRobotInterface {
     ROS_INFO("[rbt_trj] Done. (%.2f%% acheived)", fraction * 100.0);
 
     ROS_INFO("[rbt_trj] Executing the trajectory...");
-    moveit::planning_interface::MoveGroup::Plan exe_plan;
+    moveit::planning_interface::MoveGroupInterface::Plan exe_plan;
     exe_plan.trajectory_ = actions;
-    bool success = this->manipulator.execute(exe_plan);
+    bool success = (this->manipulator.execute(exe_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
     // if (success) {ROS_INFO("[rbt_trj] Done.");}
     // else {ROS_ERROR("[rbt_trj] Failed to move according to the trajectory..."); return;}
 
@@ -590,7 +590,7 @@ class DensoRobotInterface {
     {
       boost::upgrade_lock<boost::shared_mutex> lock(this->jnt_update_lock);
       boost::upgrade_to_unique_lock<boost::shared_mutex> write_lock(lock);
-      this->manipulator.getCurrentState()->copyJointGroupPositions(this->manipulator.getCurrentState()->getRobotModel()->getJointModelGroup(this->manipulator.getName()), this->current_jnt_value);
+      this->manipulator.getCurrentState()->copyJointGroupPositions(this->manipulator.getCurrentState()->getJointModelGroup(this->manipulator.getName()), this->current_jnt_value);
     }
 
     // publish
