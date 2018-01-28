@@ -58,7 +58,7 @@ class MoveItClient():
         # fill in the request
         request.next = waypoint
         # send the request
-        print ('>>> Executing waypoint %d...'.format(trj_index), end = '')
+        print ('>>> Executing waypoint {0}...'.format(trj_index), end = '')
         respond = self.go_to(request)
         # chech whether the execution is a success
         if respond.success == True:
@@ -66,7 +66,7 @@ class MoveItClient():
           continue
         else:
           print ('ERROR!')
-          print ('<<< %s'.format(respond.reason))
+          print ('<<< {0}'.format(respond.reason))
           raise AttributeError
     except (AssertionError):
       print ('[Exception] Trajectory should be Pose object.')
