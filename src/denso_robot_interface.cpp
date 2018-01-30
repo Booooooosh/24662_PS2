@@ -210,15 +210,20 @@ class DensoRobotInterface {
       return true;
     }
 
-    std::string waypoint_name = this->waypoints.back();
+    this->waypoints.pop_back();
+    if (!this->waypoints.size()) {
+      res.success = false;
+      res.reason = "All states reverted!";
+      return true;
+    }
 
+    std::string waypoint_name = this->waypoints.back();
     // revert back to the previous position
     ROS_INFO("[rbt_trj] Reverting...");
     moveit::planning_interface::MoveGroup::Plan revert_plan;
     this->manipulator.setNamedTarget(waypoint_name);
     if (this->manipulator.plan(revert_plan)) {
       bool success = this->manipulator.execute(revert_plan);
-      this->waypoints.pop_back();
       ROS_INFO("[rbt_trj] Done.");
       res.success = true;
       res.reason = "Success.";
