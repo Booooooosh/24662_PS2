@@ -28,6 +28,7 @@ add_service_files(
   MarkState.srv
   ClearStates.srv
   DeleteState.srv
+  Revert.srv
   ShowStates.srv
   ExecuteTrajectory.srv
   GoTo.srv

@@ -31,6 +31,7 @@
 
 #include <denso_robot_interface/MarkState.h>
 #include <denso_robot_interface/ClearStates.h>
+#include <denso_robot_interface/Revert.h>
 #include <denso_robot_interface/DeleteState.h>
 #include <denso_robot_interface/ShowStates.h>
 #include <denso_robot_interface/ExecuteTrajectory.h>
@@ -64,7 +65,7 @@ class DensoRobotInterface {
   ros::Publisher  jnt_values;
 
   // services provided
-  ros::ServiceServer mark_state, clear_states, show_states;
+  ros::ServiceServer mark_state, clear_states, delete_state, revert, show_states;
   ros::ServiceServer execute_trajectory;
   ros::ServiceServer go_to;
   ros::ServiceServer translation;
@@ -93,6 +94,8 @@ class DensoRobotInterface {
     ROS_INFO("[rbt_trj] Starting services...");
     this->mark_state = this->nh.advertiseService("mark_state", &DensoRobotInterface::mark_stateCb, this);
     this->clear_states = this->nh.advertiseService("clear_states", &DensoRobotInterface::clear_statesCb, this);
+    this->revert = this->nh.advertiseService("revert", &DensoRobotInterface::revertCb, this);
+    this->delete_state = this->nh.advertiseService("delete_state", &DensoRobotInterface::delete_stateCb, this);
     this->show_states = this->nh.advertiseService("show_states", &DensoRobotInterface::show_statesCb, this);
     this->execute_trajectory = this->nh.advertiseService("execute_trajectory", &DensoRobotInterface::execute_trajectoryCb, this);
     this->go_to = this->nh.advertiseService("go_to", &DensoRobotInterface::go_toCb, this);
@@ -193,6 +196,41 @@ class DensoRobotInterface {
     return true;
   }
 
+  /* Function @ revertCb
+   * callback function for revert to the previous state
+   * this will pop the last state in the list and revert
+   * the robot's state to the previous state
+   */
+  bool revertCb(denso_robot_interface::Revert::Request &req, 
+                denso_robot_interface::Revert::Response &res) {
+    // pop up the last state being marked, which we don't need anymore
+    if (!this->waypoints.size()) {
+      res.success = false;
+      res.reason = "You haven't marked down any waypoints yet. So...";
+      return true;
+    }
+
+    std::string waypoint_name = this->waypoints.back();
+
+    // revert back to the previous position
+    ROS_INFO("[rbt_trj] Reverting...");
+    moveit::planning_interface::MoveGroup::Plan revert_plan;
+    this->manipulator.setNamedTarget(waypoint_name);
+    if (this->manipulator.plan(revert_plan)) {
+      bool success = this->manipulator.execute(revert_plan);
+      this->waypoints.pop_back();
+      ROS_INFO("[rbt_trj] Done.");
+      res.success = true;
+      res.reason = "Success.";
+    } else {
+      ROS_WARN("[rbt_trj] Not able to find a plan for reverting to the previous state. You can try moving the arm to another position and try again.");
+      res.success = false;
+      res.reason = "Not able to find a plan for reverting to the previous state from the current state.";
+    }
+
+    return true;
+  }
+
   /*
    * Function @ clear_statesCb
    * callback function for clear_states service
@@ -218,7 +256,7 @@ class DensoRobotInterface {
 
   /*
    * Function @ delete_stateCb
-   * callback functino for delete_states service
+   * callback functino for delete_state service
    * this will delete a specific state according to the name given
    */
   bool delete_stateCb(denso_robot_interface::DeleteState::Request &req, 
@@ -454,128 +492,6 @@ class DensoRobotInterface {
 
     return true;
   }
-
-  /*
-   */
-  // void trajectoryCb(const blackbox::TrajectoryConstPtr &trajectory) {
-  //   ROS_INFO("[rbt_trj] Trajectory received, forwarding to MoveIt...");
-
-  //   // check trajectory validness
-  //   ROS_INFO("[rbt_trj] Checking validness of the trajectory...");
-  //   std::string trj_ref_frame = trajectory->header.frame_id;
-  //   int robot_dim = trajectory->robot_dim;
-  //   if ((trajectory->trajectory.size() % robot_dim) != 0) {
-  //     ROS_ERROR("[rbt_trj] Trajectory size doesn't match trajectory dimension!");
-  //     return;
-  //   } else {
-  //     ROS_INFO("[rbt_trj] Trajectory valid.");
-  //   }
-
-  //   // compose transformation matrix
-  //   ROS_INFO("[rbt_trj] Looking for transformation matrix from %s to %s.", trj_ref_frame.c_str(), this->target_frame.c_str());
-  //   tf::StampedTransform work2rob;
-  //   Eigen::Affine3d transformer;
-  //   try {
-  //     this->tf_listener.waitForTransform(this->target_frame, trj_ref_frame, ros::Time::now(), ros::Duration(4.f));
-  //     this->tf_listener.lookupTransform(this->target_frame, trj_ref_frame, ros::Time::now(), work2rob);
-  //   } catch (tf::LookupException &err) {
-  //     ROS_ERROR("[rbt_trj] Lookup [Work Frame --> Robot Frame] falied.");
-  //     return;
-  //   } catch (tf::ExtrapolationException &err) {
-  //     ROS_ERROR("[rbt_trj] Lookup [Work Frame --> Robot Frame] falied.");
-  //     return;
-  //   } catch (tf::TransformException &err) {
-  //     ROS_ERROR("[rbt_trj] Lookup [Work Frame --> Robot Frame] falied.");
-  //     return;
-  //   }
-  //   tf::transformTFToEigen(work2rob, transformer);
-  //   ROS_INFO("[rbt_trj] Done.");
-
-  //   // move to the start-approaching point
-  //   ROS_INFO("[rbt_trj] Approaching start point...");
-  //   this->manipulator.setJointValueTarget(this->start_approach);
-
-  //   moveit::planning_interface::MoveGroup::Plan exe_plan;
-  //   if (this->manipulator.plan(exe_plan)) {
-  //     // got a plan, now execute
-  //     bool success = this->manipulator.execute(exe_plan);
-  //     if (success)  {ROS_INFO("[rbt_trj] Done.");}
-  //     else          {ROS_ERROR("[rbt_trj] Failed to approach start point!"); return;}
-  //   } else {
-  //     ROS_ERROR("[rbt_trj] No plan generated for approaching start point!");
-  //     return;
-  //   }
-
-  //   // cartesian plan
-  //   geometry_msgs::Pose waypoint;
-  //   {
-  //     boost::shared_lock<boost::shared_mutex> read_lock(this->pose_update_lock);
-  //     waypoint = this->current_pose;
-  //   }
-  //   ROS_INFO("[rbt_trj] Currently @ P(%lf, %lf, %lf).", waypoint.position.x, waypoint.position.y, waypoint.position.z);
-
-  //   Eigen::Affine3d scaler = Eigen::Affine3d::Identity();
-  //   scaler.scale(0.001);
-
-  //   int trj_length = trajectory->trajectory.size() / robot_dim;
-  //   std::vector<float> trj = trajectory->trajectory;
-
-  //   std::vector<geometry_msgs::Pose> waypoints;
-  //   for (int trj_index = 0; trj_index < trj_length; trj_index ++) {
-  //     // move to each waypoint
-  //     Eigen::Vector3d point(trj[trj_index * robot_dim], trj[trj_index * robot_dim + 1], trj[trj_index * robot_dim + 2]);
-  //     point = transformer * scaler * point;
-  //     waypoint.position.x = point(0);
-  //     waypoint.position.y = point(1);
-  //     waypoint.position.z = point(2);
-  //     waypoints.push_back(waypoint);
-  //   }
-
-  //   ROS_INFO("[rbt_trj] Computing waypoints for the rest of the trajectory...");
-  //   moveit_msgs::RobotTrajectory actions;
-  //   double fraction = this->manipulator.computeCartesianPath(waypoints, 0.015, 0.0, actions);
-  //   ROS_INFO("[rbt_trj] Done. (%.2f%% acheived)", fraction * 100.0);
-
-  //   ROS_INFO("[rbt_trj] Executing the trajectory...");
-  //   moveit::planning_interface::MoveGroup::Plan exe_plan_2;
-  //   exe_plan_2.trajectory_ = actions;
-  //   bool success = this->manipulator.execute(exe_plan_2);
-  //   if (success) {ROS_INFO("[rbt_trj] Done.");}
-  //   else {ROS_ERROR("[rbt_trj] Failed to move according to the trajectory..."); return;}
-
-  //   // move to the ending pose
-  //   {
-  //     boost::shared_lock<boost::shared_mutex> read_lock(this->pose_update_lock);
-  //     waypoint = this->current_pose;
-  //   }
-  //   ROS_INFO("[rbt_trj] Currently @ P(%lf, %lf, %lf).", waypoint.position.x, waypoint.position.y, waypoint.position.z);
-  //   ROS_INFO("[rbt_trj] Returning to initial position...");
-  //   waypoint.position.z = 0.20740845427;
-  //   this->manipulator.setPoseTarget(waypoint);
-  //   if (this->manipulator.plan(exe_plan)) {
-  //     // got a plan, now execute
-  //     bool success = this->manipulator.execute(exe_plan);
-  //     if (!success) {ROS_ERROR("[rbt_trj] Failed to return to initial point!"); return;}
-  //   } else {
-  //     ROS_ERROR("[rbt_trj] No plan generated for returning to initial point!");
-  //     return;
-  //   }
-  //   for (int end_approach_index = 0; end_approach_index < this->end_approach.size(); end_approach_index ++) {
-  //     this->manipulator.setJointValueTarget(this->end_approach[end_approach_index]);
-
-  //     if (this->manipulator.plan(exe_plan)) {
-  //       bool success = this->manipulator.execute(exe_plan);
-  //       if (!success) {ROS_ERROR("[rbt_trj] Failed to return to initial point!"); return;}
-  //     } else {
-  //       ROS_ERROR("[rbt_trj] No plan generated for end pose!");
-  //       return;
-  //     }
-  //   }
-  //   ROS_INFO("[rbt_trj] Done.");
-  //   ROS_INFO("[rbt_trj] Layer Done. Waiting for the next frame...");
-
-  //   return;
-  // }
 
   void publish_states(void) {
     // get EEF pose
