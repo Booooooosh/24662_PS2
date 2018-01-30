@@ -31,6 +31,7 @@
 
 #include <denso_robot_interface/MarkState.h>
 #include <denso_robot_interface/ClearStates.h>
+#include <denso_robot_interface/Revert.h>
 #include <denso_robot_interface/DeleteState.h>
 #include <denso_robot_interface/ShowStates.h>
 #include <denso_robot_interface/ExecuteTrajectory.h>
@@ -64,7 +65,7 @@ class DensoRobotInterface {
   ros::Publisher  jnt_values;
 
   // services provided
-  ros::ServiceServer mark_state, clear_states, show_states;
+  ros::ServiceServer mark_state, revert, delete_state, clear_states, show_states;
   ros::ServiceServer execute_trajectory;
   ros::ServiceServer go_to;
   ros::ServiceServer translation;
@@ -93,6 +94,8 @@ class DensoRobotInterface {
     ROS_INFO("[rbt_trj] Starting services...");
     this->mark_state = this->nh.advertiseService("mark_state", &DensoRobotInterface::mark_stateCb, this);
     this->clear_states = this->nh.advertiseService("clear_states", &DensoRobotInterface::clear_statesCb, this);
+    this->revert = this->nh.advertiseService("revert", &DensoRobotInterface::revertCb, this);
+    this->delete_state = this->nh.advertiseService("delete_state", &DensoRobotInterface::delete_stateCb, this);
     this->show_states = this->nh.advertiseService("show_states", &DensoRobotInterface::show_statesCb, this);
     this->execute_trajectory = this->nh.advertiseService("execute_trajectory", &DensoRobotInterface::execute_trajectoryCb, this);
     this->go_to = this->nh.advertiseService("go_to", &DensoRobotInterface::go_toCb, this);
@@ -189,6 +192,41 @@ class DensoRobotInterface {
 
     res.success = true;
     res.reason = "Success!";
+
+    return true;
+  }
+
+  /* Function @ revertCb
+   * callback function for revert to the previous state
+   * this will pop the last state in the list and revert
+   * the robot's state to the previous state
+   */
+  bool revertCb(denso_robot_interface::Revert::Request &req, 
+                denso_robot_interface::Revert::Response &res) {
+    // pop up the last state being marked, which we don't need anymore
+    if (!this->waypoints.size()) {
+      res.success = false;
+      res.reason = "You haven't marked down any waypoints yet. So...";
+      return true;
+    }
+
+    std::string waypoint_name = this->waypoints.back();
+
+    // revert back to the previous position
+    ROS_INFO("[rbt_trj] Reverting...");
+    moveit::planning_interface::MoveGroupInterface::Plan revert_plan;
+    this->manipulator.setNamedTarget(waypoint_name);
+    if (this->manipulator.plan(revert_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS) {
+      bool success = this->manipulator.execute(revert_plan);
+      this->waypoints.pop_back();
+      ROS_INFO("[rbt_trj] Done.");
+      res.success = true;
+      res.reason = "Success.";
+    } else {
+      ROS_WARN("[rbt_trj] Not able to find a plan for reverting to the previous state. You can try moving the arm to another position and try again.");
+      res.success = false;
+      res.reason = "Not able to find a plan for reverting to the previous state from the current state.";
+    }
 
     return true;
   }
