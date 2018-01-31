@@ -105,6 +105,46 @@ class DensoRobotInterface {
     // Service: download states
     ROS_INFO("[rbt_trj] Done.");
 
+    // reload waypoints
+    this->waypoints.clear();
+    XmlRpc::XmlRpcValue jnt_space_map;
+    if (this->pnh.getParam("waypoints/joint_space", jnt_space_map)) {
+      ROS_INFO("[rbt_trj] Retrieve your previous waypoints...");
+      for (XmlRpc::XmlRpcValue::ValueStruct::const_iterator it = jnt_space_map.begin(); it != jnt_space_map.end(); ++ it) {
+        std::string jnt_name = static_cast<std::string>(it->first);
+        ROS_INFO("[rbt_trj] >>> %s", jnt_name.c_str());
+        XmlRpc::XmlRpcValue jnt_recovered = it->second;
+        if (jnt_recovered.getType() != XmlRpc::XmlRpcValue::TypeArray)
+          continue;
+
+        // convert to vector
+        bool joint_valid = true;
+        std::vector<double> tmp_jnt_value;
+        for (int index = 0; index < jnt_recovered.size(); index ++) {
+          if (jnt_recovered[index].getType() != XmlRpc::XmlRpcValue::TypeDouble) {
+            ROS_WARN("[rbt_trj] Joint values are mal-constructed!");
+            joint_valid = false;
+            break;
+          }
+
+          tmp_jnt_value.push_back(static_cast<double>(jnt_recovered[index]));
+        }
+
+        // add to list
+        if (joint_valid) {
+          this->waypoints.push_back(jnt_name);
+          this->manipulator.rememberJointValues(jnt_name, tmp_jnt_value);
+        } else {
+          ROS_WARN("[rbt_trj] Failed to load all joint values!");
+          break;
+        }
+      }
+
+      ROS_INFO("[rbt_trj] All previous joint values reloaded!");
+    } else {
+      ROS_WARN("[rbt_trj] We're not reloading any states. Initializing empty state list...");
+    }
+
     // load buildbox into planning scene
     std::map<std::string, std::string> models;
     std::string model_ref_frame = this->pnh.param<std::string>("workspace/ref_frame", "robot_work_frame");
